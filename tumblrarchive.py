@@ -9,6 +9,7 @@ import time
 import traceback
 import urllib
 import os
+import json
 
 
 class Worker(object):
@@ -66,7 +67,7 @@ class StorePost(Job):
 
         os.makedirs(postdirectory)
         with open(os.path.join(postdirectory, "json"), "w") as f:
-            f.write(str(self.post))
+            f.write(json.dumps(self.post))
 
 
 class FetchPostInfoJob(Job):
