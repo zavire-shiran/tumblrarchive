@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 import urllib
+import os
 
 
 class Worker(object):
@@ -52,6 +53,22 @@ class Job(object):
             statusqueue.put(self.log)
 
 
+class StorePost(Job):
+    def __init__(self, url, post):
+        super(StorePost, self).__init__()
+        self.url = url
+        self.post = post
+
+    def execute_inner(self):
+        postdate = datetime.strptime(self.post[u"date"], "%Y-%m-%d %H:%M:%S %Z")
+        postdirectory = os.path.join(self.url, str(postdate.year), "{0}-{1}".format(postdate.month, postdate.day), str(self.post[u"id"]))
+        self.log.append("{0} {1} {2} {3}".format(self.url, self.post[u"id"], self.post[u"type"], postdirectory))
+
+        os.makedirs(postdirectory)
+        with open(os.path.join(postdirectory, "json"), "w") as f:
+            f.write(str(self.post))
+
+
 class FetchPostInfoJob(Job):
     limit = 20
 
@@ -66,7 +83,7 @@ class FetchPostInfoJob(Job):
             workqueue.put(FetchPostInfoJob(self.url, self.post_offset + self.limit))
 
         for post in response[u"posts"]:
-            self.log.append("{0} {1} {2}".format(self.url, post[u"id"], post[u"type"]))
+            workqueue.put(StorePost(self.url, post))
 
 
 def workers_running(workers, max_time_since_active):
@@ -84,7 +101,8 @@ def run_jobs(queue, workers):
 def shutdownworkers():
     for w in workers:
         w.running = False
-    for w in workers:
+    for i,w in enumerate(workers):
+        print "stopping", i
         w.thread.join()
 
 workqueue = Queue.Queue()
