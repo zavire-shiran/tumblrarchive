@@ -62,7 +62,7 @@ class FetchPostInfoJob(Job):
 
     def execute_inner(self):
         response = tumblrclient.posts(self.url, offset=self.post_offset, limit=self.limit)
-        if response[u"posts"] > self.post_offset:
+        if response[u"blog"][u"posts"] > self.post_offset:
             workqueue.put(FetchPostInfoJob(self.url, self.post_offset + self.limit))
 
         for post in response[u"posts"]:
