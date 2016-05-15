@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from HTMLParser import HTMLParser
 import pytumblr
 import Queue
@@ -10,6 +11,7 @@ import traceback
 import urllib
 import os
 import json
+import errno
 
 
 class Worker(object):
@@ -65,7 +67,15 @@ class StorePost(Job):
         postdirectory = os.path.join(self.url, str(postdate.year), "{0}-{1}".format(postdate.month, postdate.day), str(self.post[u"id"]))
         self.log.append("{0} {1} {2} {3}".format(self.url, self.post[u"id"], self.post[u"type"], postdirectory))
 
-        os.makedirs(postdirectory)
+        if self.post["type"] == "photo":
+            for photo in self.post["photos"]:
+                workqueue.put(FetchImageJob(photo["original_size"]["url"], postdirectory))
+
+        try:
+            os.makedirs(postdirectory)
+        except os.error as e:
+            if e.errno != errno.EEXIST:
+                raise
         with open(os.path.join(postdirectory, "json"), "w") as f:
             f.write(json.dumps(self.post))
 
@@ -85,6 +95,19 @@ class FetchPostInfoJob(Job):
 
         for post in response[u"posts"]:
             workqueue.put(StorePost(self.url, post))
+
+
+class FetchImageJob(Job):
+    def __init__(self, image_url, savepath):
+        super(FetchImageJob, self).__init__()
+        self.image_url = image_url
+        self.savepath = savepath
+
+    def execute_inner(self):
+        self.log.append("Fetching {0} to {1}".format(self.image_url, self.savepath))
+        image = urllib.urlopen(self.image_url).read()
+        filename = self.image_url.split("/")[-1]
+        open(os.path.join(self.savepath, filename), "w").write(image)
 
 
 def workers_running(workers, max_time_since_active):
